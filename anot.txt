@@ -1,0 +1,16 @@
+
+exemplo graphql
+
+
+query {
+    queryPosts(tags: ["azumanga_daioh", "gif"], page: 1) {
+      posts {
+        id
+        tags
+      }
+      tags {
+        name
+      }
+    }
+  }
+  

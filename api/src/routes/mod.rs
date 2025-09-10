@@ -1,1 +1,1 @@
-pub mod file_route;
+pub mod graphql;

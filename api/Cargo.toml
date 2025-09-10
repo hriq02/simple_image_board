@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = "0.6.20"
+axum = "0.8.4"
 tokio = { version = "1.32.0", features = ["full"] }
 serde = { version = "1.0.188", features = ["derive"] }
-async-graphql = "6.0.6"
-async-graphql-axum = "6.0.6"
+async-graphql = "7.0.17"
+async-graphql-axum = "7.0.17"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio"] }
+tower-http = { version = "0.6.6", features = ["cors"] }

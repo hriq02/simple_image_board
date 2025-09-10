@@ -7,3 +7,16 @@ pub struct Post {
     pub artist: Option<String>,
     pub tags: Vec<String>,
 }
+
+
+#[derive(SimpleObject, sqlx::FromRow, Debug)]
+pub struct Tag {
+    pub name: String,
+}
+
+
+#[derive(SimpleObject, sqlx::FromRow, Debug)]
+pub struct Query{
+    pub tags : Vec<Tag>,
+    pub posts : Vec<Post>,
+}

@@ -1,15 +1,13 @@
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
-use axum::{extract::Extension, routing::get, Router, Server};
+use axum::{extract::Extension, routing::{get,post}, Router};
+use routes::graphql::{graphql_handler, graphql_playground, health};
+use tower_http::cors::{Any, CorsLayer};
 use model::file_schema::QueryRoot;
+use tokio::net::TcpListener;
 
 mod routes;
 mod model;
 mod services;
-
-#[derive(Clone)]
-pub struct AppState {
-    pool: sqlx::Pool<sqlx::Postgres>,
-}
 
 
 #[tokio::main]
@@ -17,21 +15,26 @@ async fn main() {
     let pool = services::sql_service::setup_db().await;
     let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription).data(pool.clone()).finish();
 
-    let state = AppState{
-        pool
-    };
-
     print!("\x1B[2J\x1B[1;1H"); //clear terminal
-    println!("Listening on http://localhost:8000/");
+    println!("API Started on http://localhost:8000/");
+
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(Any)
+        .allow_headers(Any);
     
     let app = Router::new()
-        .with_state(state)
-        .route("/", get(routes::file_route::graphql_playground).post(routes::file_route::graphql_handler))
-        .route("/health", get(routes::file_route::health))
-        .layer(Extension(schema));
+        .route("/playground", 
+            get(graphql_playground)
+            .post(graphql_handler)
+        )
+        .route("/query", post(graphql_handler))
+        .route("/health", get(health))
+        .layer(Extension(schema))
+        .layer(cors);
 
-    Server::bind(&"0.0.0.0:8000".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    
+
+    let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }

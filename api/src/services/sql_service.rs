@@ -1,8 +1,6 @@
 
 
 
-
-
 pub async fn setup_db() -> sqlx::Pool<sqlx::Postgres> {
     let pool = setup_conn().await;
     setup_tables(&pool).await;    
@@ -23,7 +21,14 @@ pub async fn setup_conn() -> sqlx::Pool<sqlx::Postgres> {
 
 
 pub async fn setup_tables(pool: &sqlx::Pool<sqlx::Postgres>) {
-    sqlx::query(
+    async fn query( pool: &sqlx::Pool<sqlx::Postgres>,query: &str, error : &str) {
+        sqlx::query(query)
+        .execute(pool)
+        .await
+        .expect(error);
+    }
+
+    query(pool,
         r#"
         CREATE TABLE IF NOT EXISTS posts (
             id SERIAL PRIMARY KEY,
@@ -31,33 +36,35 @@ pub async fn setup_tables(pool: &sqlx::Pool<sqlx::Postgres>) {
             artist VARCHAR(100),
             tags TEXT[] NOT NULL
         );
-        "#
-    )
-    .execute(pool)
-    .await
-    .expect("Failed to create posts table");
+        "#,
+        "Failed to create posts table"
+    ).await;
 
-    sqlx::query(
+
+    query(pool,
         r#"
         CREATE TABLE IF NOT EXISTS users (
             username VARCHAR(40) PRIMARY KEY,
             password VARCHAR(50) NOT NULL,
             email VARCHAR(100)
         );
-        "#
-    )
-    .execute(pool)
-    .await
-    .expect("Failed to create users table");
+        "#,
+        "Failed to create users table"
+    ).await;
 
-    sqlx::query(
+    query(pool,
         r#"
         CREATE TABLE IF NOT EXISTS tags (
             name text PRIMARY KEY
         );
-        "#
+        "#, 
+        "Failed to create tags table"
     )
-    .execute(pool)
-    .await
-    .expect("Failed to create tags table");
+    .await;
+
+    query(pool,
+        "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
+    "Failed to create pg_trgm extension"
+    ).await;
+    
 }

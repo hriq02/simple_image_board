@@ -23,3 +23,6 @@ target
 #node
 
 node_modules/
+
+resources/
+*:Zone.Identifier
