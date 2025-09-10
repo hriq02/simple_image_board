@@ -72,7 +72,6 @@ impl QueryRoot {
         Ok(tags)
     }
 
-
     async fn query_posts(
         &self,
         ctx: &Context<'_>,
@@ -83,8 +82,8 @@ impl QueryRoot {
         let limit = 20;
         let offset = ((page - 1).max(0) * limit) as i64;
     
+        // Se não houver tags, pega todos os posts
         let posts = if tags.is_empty() {
-            // pegar todos os posts
             sqlx::query_as::<_, Post>(
                 r#"
                 SELECT id, uploader, artist, tags
@@ -98,28 +97,28 @@ impl QueryRoot {
             .fetch_all(pool)
             .await?
         } else {
-            // filtrar por tags
             sqlx::query_as::<_, Post>(
                 r#"
                 SELECT id, uploader, artist, tags
                 FROM posts
-                WHERE tags @> $1
+                WHERE tags @> $1::text[]
                 LIMIT $2
                 OFFSET $3
                 "#
             )
-            .bind(&tags)
+            .bind(&tags[..])
             .bind(limit)
             .bind(offset)
             .fetch_all(pool)
             .await?
         };
     
-        let tags = posts.iter()
+        let all_tags = posts.iter()
             .flat_map(|post| post.tags.clone())
             .map(|tag| Tag { name: tag })
             .collect();
     
-        Ok(Some(Query { posts, tags }))
+        Ok(Some(Query { posts, tags: all_tags }))
     }
+    
 }

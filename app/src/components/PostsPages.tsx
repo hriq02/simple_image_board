@@ -12,34 +12,6 @@ async function getMimeType(url: string): Promise<string | null> {
   }
 }
 
-async function fetchPosts(tags: string[], page: number = 1) {
-  const query = `
-    query($tags: [String!]!, $page: Int!) {
-      queryPosts(tags: $tags, page: $page) {
-        posts { id, uploader, artist, tags }
-        tags { name }
-      }
-    }
-  `;
-
-  const res = await fetch("http://localhost:8000/query", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-        query,
-        variables: { tags, page }
-    }),
-  });
-
-  if (!res.ok) {
-      console.error("GraphQL request failed", await res.text());
-      return null;
-  }
-
-  const json = await res.json();
-  console.log(json.data.queryPosts);
-  return json.data.queryPosts;
-}
 
 function useVideoThumbnail(url: string) {
   const [thumb, setThumb] = createSignal<string | null>(null);
@@ -67,21 +39,11 @@ function useVideoThumbnail(url: string) {
   return thumb;
 }
 
-const PostsPages: Component = () => {
-  const params = new URLSearchParams(window.location.search);
-  const q = params.get("q") ?? "";
-  const page = parseInt(params.get("page") ?? "1", 10);
-  const tags = q.split("+").filter(Boolean);
-
-  const [postsData] = createResource(
-    () => ({ tags, page }),
-    ({ tags, page }) => fetchPosts(tags, page)
-  );
-
+const PostsPages: Component<{ posts: Post[] | undefined}> = (props) => {
   return (
     <div>
       <ul class="thumbs_grid">
-        <For each={postsData()?.posts ?? []}>
+        <For each={props.posts ?? []}>
           {(post) => {
             const url = `http://localhost:7000/${post.id}`;
             const [mime] = createResource(() => getMimeType(url));
