@@ -8,6 +8,7 @@ function format_search(search: string) : string{
 const Header: Component<{
   search: string;
   setSearch: (s: string) => void;
+  toggleModal: () => void;
 }> = (props) => {
 
   const handleInput = (e: Event) => {
@@ -24,13 +25,21 @@ const Header: Component<{
       <div>
         <input 
           type="text" 
-          placeholder="Search" 
+          placeholder="Search"
+          class="input"
           value={props.search} 
           onInput={handleInput} 
         />
         <button
-            onClick={() => window.location.href = format_search(props.search)}
+          class="button"
+          onClick={() => window.location.href = format_search(props.search)}
         >...
+        </button>
+        <button
+          class="button"
+          onClick={props.toggleModal}
+        >
+          upload
         </button>
       </div>
     </div>

@@ -1,20 +1,21 @@
+use crate::logger;
 
 
 
-pub async fn setup_db() -> sqlx::Pool<sqlx::Postgres> {
-    let pool = setup_conn().await;
+
+pub async fn setup_db() -> Result<sqlx::Pool<sqlx::Postgres>, sqlx::Error> {
+    let pool = setup_conn().await?;
     setup_tables(&pool).await;    
-    pool
+    Ok(pool)
 }
 
-pub async fn setup_conn() -> sqlx::Pool<sqlx::Postgres> {
+pub async fn setup_conn() -> Result<sqlx::Pool<sqlx::Postgres>, sqlx::Error> {
     let database_url = "postgresql://admin:123456@localhost:5000/database?sslmode=disable";
 
     sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)
         .connect(database_url)
         .await
-        .expect(&format!("Database connection error"))
 }
 
 
@@ -22,10 +23,10 @@ pub async fn setup_conn() -> sqlx::Pool<sqlx::Postgres> {
 
 pub async fn setup_tables(pool: &sqlx::Pool<sqlx::Postgres>) {
     async fn query( pool: &sqlx::Pool<sqlx::Postgres>,query: &str, error : &str) {
-        sqlx::query(query)
-        .execute(pool)
-        .await
-        .expect(error);
+        match sqlx::query(query).execute(pool).await{
+            Ok(_) => (),
+            Err(e) => logger::log_err(error, e, logger::LogLevel::Error)
+        }
     }
 
     query(pool,

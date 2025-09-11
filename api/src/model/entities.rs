@@ -1,6 +1,7 @@
 use async_graphql::SimpleObject;
+use serde::{Deserialize, Serialize};
 
-#[derive(SimpleObject, sqlx::FromRow, Debug)]
+#[derive(SimpleObject, sqlx::FromRow, Debug,Deserialize, Serialize)]
 pub struct Post {
     pub id: i32,
     pub uploader: String,

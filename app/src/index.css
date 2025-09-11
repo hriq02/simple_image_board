@@ -59,9 +59,38 @@ code {
 
 .tag{
   cursor: pointer;
+  font-size: 0.85vw;
 }
 .tag:hover{
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.25);
   padding: 7px;
 }
 
+
+.button {
+  border: 1px solid #392d81;
+  border-radius: 1px;
+  font-size: 0.85vw;
+  padding: 0.1% 1%;
+  background-color: white;
+  color: #000000;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.button:hover {
+  background-color: #cacaca;
+}
+
+.input{
+  border: 1px solid #392d81;
+  border-radius: 1px;
+  padding: 0.1% 1%;
+  font-size: 0.85vw;
+  background-color: white;
+  color: #000000;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}

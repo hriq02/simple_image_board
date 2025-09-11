@@ -7,6 +7,7 @@ import Header from './components/header';
 import PostsPages from './components/PostsPages';
 import { QueryReq } from './schemas';
 import Footer from './components/footer';
+import UploadModal from './components/UploadModal';
 
 async function fetchPosts(tags: string[], page: number = 1) {
   const query = `
@@ -48,9 +49,20 @@ const App: Component = () => {
     () => ({ tags, page }),
     ({ tags, page }) => fetchPosts(tags, page)
   );
+
+  const [modalOpen, setModalOpen] = createSignal(false);
+
+  const toggleModal = () => {
+    setModalOpen(!modalOpen());
+  };
+
   return (
     <div>
-      <Header search={search()} setSearch={setSearch}/>
+      {modalOpen() && <UploadModal toggleModal={toggleModal} />}
+      <Header 
+        search={search()} setSearch={setSearch}
+        toggleModal={toggleModal}
+      />
       <div class="panels-father">
         <TagsTab 
           tags={postsData()?.tags} 
@@ -58,7 +70,7 @@ const App: Component = () => {
             setSearch((prev) => {
               const tagsArray = prev.split('+').filter(Boolean);
               if (!tagsArray.includes(tag)) {
-                tagsArray.push(tag); // adiciona só se não existir
+                tagsArray.push(tag);
               }
               return tagsArray.join(' ');
             });
