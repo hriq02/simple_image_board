@@ -6,12 +6,11 @@ use axum::{
 };
 use mime_guess::mime;
 use std::path::PathBuf;
-use tokio::fs::File;
+use tokio::fs::{File, OpenOptions};
 use tokio_util::io::ReaderStream;
-
+use axum::extract::multipart::Multipart;
+use tokio::io::AsyncWriteExt;
 use crate::AppState;
-
-
 
 pub async fn serve_file(
     Path(filename): Path<String>,
@@ -115,4 +114,90 @@ pub async fn stream_with_range(
         .header(header::ACCEPT_RANGES, "bytes")
         .body(boxed(Full::from(Bytes::from(buffer))))
         .unwrap()
+}
+
+
+
+
+pub async fn insert_new_file(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> impl IntoResponse {
+    let mut created_files = Vec::new();
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        // clone o nome do arquivo imediatamente
+        let original_ext = field
+            .file_name()
+            .and_then(|s| std::path::Path::new(s).extension())
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let data = field.bytes().await.unwrap(); // consome o Field
+
+        // Descobre o próximo número
+        let mut max_num = 0;
+        if let Ok(mut entries) = tokio::fs::read_dir(&*state.media_dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Some(name) = entry.file_name().to_str() {
+                    let stem = std::path::Path::new(name)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                    if let Ok(num) = stem.parse::<u64>() {
+                        if num > max_num {
+                            max_num = num;
+                        }
+                    }
+                }
+            }
+        }
+
+        let next_num = max_num + 1;
+
+        let mut file_path = (*state.media_dir).clone();
+        if original_ext.is_empty() {
+            file_path.push(next_num.to_string());
+        } else {
+            file_path.push(format!("{}.{}", next_num, original_ext));
+        }
+
+        // Cria o novo arquivo
+        match OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&file_path)
+            .await
+        {
+            Ok(mut f) => {
+                if let Err(err) = f.write_all(&data).await {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed to write file: {}", err),
+                    )
+                        .into_response();
+                }
+            }
+            Err(err) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to create file: {}", err),
+                )
+                    .into_response();
+            }
+        }
+
+        created_files.push(file_path.file_name().unwrap().to_string_lossy().to_string());
+    }
+
+    if created_files.is_empty() {
+        (StatusCode::BAD_REQUEST, "No file uploaded").into_response()
+    } else {
+        (
+            StatusCode::CREATED,
+            format!("Files uploaded successfully: {:?}", created_files),
+        )
+            .into_response()
+    }
 }
