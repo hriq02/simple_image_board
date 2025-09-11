@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::{logger, model::entities::Post};
 use async_graphql::{Context, EmptyMutation, EmptySubscription, Object, Schema};
 use sqlx::PgPool;
@@ -8,11 +7,14 @@ pub(crate) struct QueryRoot;
 pub(crate) type ServiceSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
 #[Object]
 impl QueryRoot {
-        async fn query_tag(&self, ctx: &Context<'_>, near_tag: String) -> async_graphql::Result<Vec<Tag>> {
+    async fn query_tag(
+        &self, ctx: &Context<'_>, 
+        near_tag: String
+    ) -> async_graphql::Result<Vec<Tag>> {
         Ok(
             sqlx::query_as::<_, Tag>(
                 r#"
-                SELECT name
+                SELECT name, tag_type
                 FROM tags
                 ORDER BY similarity(name, $1) DESC
                 LIMIT 10
@@ -22,7 +24,11 @@ impl QueryRoot {
             .fetch_all(ctx.data::<PgPool>()?)
             .await
             .map_err(|e| {
-                let gql_error = async_graphql::ServerError::new(format!("Database error: {}", e), std::option::Option::None); // <- pos = None
+                let gql_error = 
+                        async_graphql::ServerError::new(
+                            format!("Database error: {}", e), 
+                            std::option::Option::None
+                        );
                 logger::log_err(
                     "Failed to query tags",
                     gql_error.clone(),
@@ -42,10 +48,13 @@ impl QueryRoot {
         let pool = ctx.data::<PgPool>()?;
         let limit = 20;
         let offset = ((page - 1).max(0) * limit) as i64;
-        let mut unique_tags : HashSet<String> = HashSet::new();
 
         let err = |e| {
-            let gql_error = async_graphql::ServerError::new(format!("Database error: {}", e), std::option::Option::None); // <- pos = None
+            let gql_error = 
+                        async_graphql::ServerError::new(
+                            format!("Database error: {}", e)
+                            , std::option::Option::None
+                        );
             logger::log_err(
                 "Failed to query posts",
                 gql_error.clone(),
@@ -85,14 +94,36 @@ impl QueryRoot {
             .await
             .map_err(err)?
         };
+
+        let tags_from_posts = posts.iter().map(|p| p.tags.clone()).flatten().collect::<Vec<String>>();
+
+        let tags = sqlx::query_as::<_, Tag>(
+            r#"
+            SELECT name, tag_type
+            FROM tags
+            WHERE name = ANY($1::text[])
+            "#
+        )
+        .bind(tags_from_posts)
+        .fetch_all(pool)
+        .await
+        .map_err( |e|
+            {
+                let gql_error = 
+                    async_graphql::ServerError::new(
+                        format!("Database error: {}", e), 
+                        std::option::Option::None
+                    );
+                logger::log_err(
+                    "Failed to query tags",
+                    gql_error.clone(),
+                    logger::LogLevel::Warn,
+                );
+                gql_error
+            }
+        )?;
     
-        let all_tags = posts.iter()
-            .flat_map(|post| post.tags.clone())
-            .filter(|tag| unique_tags.insert(tag.clone()))
-            .map(|tag| Tag { name: tag })
-            .collect();
-    
-        Ok(Query { posts, tags: all_tags })
+        Ok(Query { posts, tags })
     }
     
 }

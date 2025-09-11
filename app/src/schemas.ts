@@ -16,10 +16,10 @@ export enum TagType{
 
 
 export function tag_to_type(tag: Tag) : TagType{
-    if (!tag.type){
+    if (!tag.tagType){
         return TagType.DEFAULT;
     }
-    switch(tag.type){
+    switch(tag.tagType){
         case "A":
             return TagType.ARTIST;
         case "U":
@@ -50,7 +50,7 @@ export interface Post {
 
 export interface Tag {
     name: string;
-    type: string;
+    tagType: string;
 }
 
 export interface QueryReq{

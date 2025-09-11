@@ -8,17 +8,17 @@ function get_color_type(type: TagType): string {
       case TagType.ARTIST:
         return "color: red;";
       case TagType.USER:
-        return "color: blue;";
-      case TagType.IMAGE:
-        return "color: yellow;";
-      case TagType.VIDEO:
         return "color: orange;";
+      case TagType.IMAGE:
+        return "color: #67b1ff;";
+      case TagType.VIDEO:
+        return "color: blue;";
       case TagType.GIF:
-        return "color: purple;";
+        return "color: #8a58ff;";
       case TagType.CHARACTER:
-        return "color: pink;";
+        return "color: green;";
       case TagType.COPYRIGHT:
-        return "color: brown;";
+        return "color: rgb(119, 128, 0)";
       case TagType.DEFAULT:
         return "color: green;";
       default:

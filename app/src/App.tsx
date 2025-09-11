@@ -14,7 +14,7 @@ async function fetchPosts(tags: string[], page: number = 1) {
     query($tags: [String!]!, $page: Int!) {
       queryPosts(tags: $tags, page: $page) {
         posts { id, uploader, artist, tags }
-        tags { name }
+        tags { name, tagType}
       }
     }
   `;

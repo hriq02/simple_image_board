@@ -36,12 +36,14 @@ async fn run() -> Result<(), std::io::Error>{
         TcpListener::bind("0.0.0.0:8000").await?,
         Router::new()
         .route("/upload",post(routes::upload::upload))
+        .route("/new_tag",post(routes::new_tag::new_tag))
         .route("/playground", 
             get(graphql_playground)
             .post(graphql_handler)
         )
         .route("/query", post(graphql_handler))
         .route("/health", get(health))
+        .layer(Extension(pool.clone()))
         .layer(Extension(
             Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
                 .data(pool)
