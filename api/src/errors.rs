@@ -46,7 +46,6 @@ impl From <std::io::Error> for ServerError {
 }
 
 impl From <String> for ServerError {
-
     fn from(err: String) -> Self {
         ServerError::OtherError(err)
     }

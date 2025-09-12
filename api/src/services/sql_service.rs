@@ -85,7 +85,7 @@ pub async fn insert_tag(pool: &sqlx::Pool<sqlx::Postgres>, tag : &Tag){
 }
 
 
-pub async fn insert_post(pool: &sqlx::Pool<sqlx::Postgres>, post : &PostUpload) -> i64{
+pub async fn insert_post(pool: &sqlx::Pool<sqlx::Postgres>, post : &PostUpload){
     let tags_str : Vec<String> = post.tags.iter().map(|t| t.name.clone()).collect();
     match sqlx::query("INSERT INTO posts (uploader, artist, tags) VALUES ($1, $2, $3)")
     .bind(post.uploader.clone())
@@ -97,10 +97,18 @@ pub async fn insert_post(pool: &sqlx::Pool<sqlx::Postgres>, post : &PostUpload) 
         Ok(_) => (),
         Err(e) => logger::log_err("Failed to create post", e, logger::LogLevel::Error)  
     }
+}
 
-    return sqlx::query("SELECT COUNT(*) FROM posts")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-        .get::<i64, _>(0);
+
+pub async fn get_next_post_serial(pool: &sqlx::Pool<sqlx::Postgres>) -> i64{
+    return match sqlx::query("SELECT currval('posts_id_seq')")
+    .fetch_one(pool)
+    .await
+    {
+        Ok(row) => row.get::<i64,_>(0),
+        Err(e) => {
+            logger::log_err("Failed to get next serial", e, logger::LogLevel::Error);
+            -1
+        }
+    }
 }

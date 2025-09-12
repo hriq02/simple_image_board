@@ -11,6 +11,9 @@ mod services;
 mod logger;
 mod errors;
 
+use routes::endpoints;
+
+
 #[tokio::main]
 async fn main() {
     
@@ -35,8 +38,9 @@ async fn run() -> Result<(), std::io::Error>{
     axum::serve(
         TcpListener::bind("0.0.0.0:8000").await?,
         Router::new()
-        .route("/upload",post(routes::upload::upload))
-        .route("/new_tag",post(routes::new_tag::new_tag))
+        .route("/upload",post(endpoints::upload))
+        .route("/new_tag",post(endpoints::new_tag))
+        .route("/next_post_id",get(endpoints::get_next_post_id))
         .route("/playground", 
             get(graphql_playground)
             .post(graphql_handler)

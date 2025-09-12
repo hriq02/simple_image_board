@@ -10,47 +10,43 @@ use tokio::fs::{File, OpenOptions};
 use tokio_util::io::ReaderStream;
 use axum::extract::multipart::Multipart;
 use tokio::io::AsyncWriteExt;
-use crate::AppState;
+use crate::{file_register::{get_file_type, FileMetadata, FileType}, AppState};
 
 pub async fn serve_file(
     Path(filename): Path<String>,
     headers: HeaderMap,
     State(state): State<AppState>,
-    method: Method, // adicionado
+    method: Method,
 ) -> impl IntoResponse {
-    let mut file_path = (*state.media_dir).clone();
-    file_path.push(&filename);
-
-    if !file_path.exists() {
-        let mut found: Option<PathBuf> = None;
-        if let Ok(mut entries) = tokio::fs::read_dir(&*state.media_dir).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                let path = entry.path();
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    if stem == filename {
-                        found = Some(path);
-                        break;
-                    }
-                }
-            }
+    let file_register = state.file_register.lock().await;
+    
+    let id : u64 = match filename.parse(){
+        Ok(vl) => vl,
+        Err(_) => {
+            return (StatusCode::NOT_FOUND, format!("File Not Found: {}" , filename)).into_response();
         }
+    };
 
-        if let Some(path) = found {
-            file_path = path;
-        } else {
-            return (StatusCode::NOT_FOUND, "File Not Found").into_response();
-        }
+    if !file_register.contains(id) {
+        return (StatusCode::NOT_FOUND, format!("File Not Found: {}" , id)).into_response();
     }
 
-    let mime = mime_guess::from_path(&file_path).first_or_octet_stream();
-    let metadata = tokio::fs::metadata(&file_path).await.unwrap();
-    let file_size = metadata.len();
+    
+    let file_metadata = match file_register.get(id){
+        Some(file) => file,
+        None => {
+            return (StatusCode::NOT_FOUND, format!("File Not Found: {}" , filename)).into_response();
+        }
+    };
+    
+    let file_path = PathBuf::from(file_metadata.file_path.clone()); 
 
-    // Se for HEAD, retorna só os headers
+
+    let mime = mime_guess::from_path(&file_path).first_or_octet_stream();
     if method == Method::HEAD {
         return Response::builder()
             .header(header::CONTENT_TYPE, mime.to_string())
-            .header(header::CONTENT_LENGTH, file_size.to_string())
+            .header(header::CONTENT_LENGTH, file_metadata.file_size.to_string())
             .header("Access-Control-Allow-Origin", "*") 
             .header(header::ACCEPT_RANGES, "bytes")
             .status(StatusCode::OK)
@@ -58,9 +54,8 @@ pub async fn serve_file(
             .unwrap();
     }
 
-    // Se for vídeo e tiver Range
-    let is_video = mime.type_() == mime::VIDEO;
-    if is_video {
+    
+    if file_metadata.file_type == FileType::Video {
         if let Some(range) = headers.get(header::RANGE) {
             if let Ok(range_str) = range.to_str() {
                 return stream_with_range(file_path, range_str, mime).await;
@@ -68,14 +63,13 @@ pub async fn serve_file(
         }
     }
 
-    // resposta padrão para GET
     let file = File::open(&file_path).await.unwrap();
     let stream = ReaderStream::new(file);
     let body = StreamBody::new(stream);
 
     Response::builder()
         .header(header::CONTENT_TYPE, mime.to_string())
-        .header(header::CONTENT_LENGTH, file_size.to_string())
+        .header(header::CONTENT_LENGTH, file_metadata.file_size.to_string())
         .header("Access-Control-Allow-Origin", "*") 
         .header(header::ACCEPT_RANGES, "bytes")
         .body(boxed(body))
@@ -123,81 +117,107 @@ pub async fn insert_new_file(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> impl IntoResponse {
-    let mut created_files = Vec::new();
 
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        // clone o nome do arquivo imediatamente
-        let original_ext = field
-            .file_name()
-            .and_then(|s| std::path::Path::new(s).extension())
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_string();
+    let mut file_register = state.file_register.lock().await;
 
-        let data = field.bytes().await.unwrap(); // consome o Field
+    let field = match multipart.next_field().await {
+        Ok(Some(field)) => field,
+        Ok(None) => return (
+            StatusCode::BAD_REQUEST,
+            "No file uploaded",
+        ).into_response(),
+        Err(e) => return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to read file: {}", e),
+        ).into_response(),
+    };
 
-        // Descobre o próximo número
-        let mut max_num = 0;
-        if let Ok(mut entries) = tokio::fs::read_dir(&*state.media_dir).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if let Some(name) = entry.file_name().to_str() {
-                    let stem = std::path::Path::new(name)
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("");
-                    if let Ok(num) = stem.parse::<u64>() {
-                        if num > max_num {
-                            max_num = num;
-                        }
-                    }
-                }
-            }
+    let original_ext = field
+        .file_name()
+        .and_then(|s| std::path::Path::new(s).extension())
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    if original_ext.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            "No file uploaded",
+        ).into_response();
+    }
+
+    let data = match field.bytes().await{
+        Ok(data) => data,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to read file: {}", e),
+            ).into_response();
         }
+    };
 
-        let next_num = max_num + 1;
-
-        let mut file_path = (*state.media_dir).clone();
-        if original_ext.is_empty() {
-            file_path.push(next_num.to_string());
-        } else {
-            file_path.push(format!("{}.{}", next_num, original_ext));
+    let next_num = match get_next_id().await{
+        Ok(num) => num,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to get next post id: {}", e),
+            ).into_response();
         }
+    };
+    println!("new file created with the id: {}", next_num);
+    
+    file_register.insert(next_num, FileMetadata{
+        file_path: next_num.to_string(),
+        extension: original_ext.clone(),
+        file_size: data.len() as u64,
+        file_type: get_file_type(&original_ext)
+    });
 
-        // Cria o novo arquivo
-        match OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&file_path)
-            .await
-        {
-            Ok(mut f) => {
-                if let Err(err) = f.write_all(&data).await {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Failed to write file: {}", err),
-                    )
-                        .into_response();
-                }
-            }
-            Err(err) => {
+    let file_path = PathBuf::from(format!("{}/{}.{}", file_register.folder.to_string_lossy(), next_num, original_ext));
+
+    match OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&file_path)
+        .await
+    {
+        Ok(mut f) => {
+            if let Err(err) = f.write_all(&data).await {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to create file: {}", err),
+                    format!("Failed to write file: {}", err),
                 )
                     .into_response();
             }
         }
-
-        created_files.push(file_path.file_name().unwrap().to_string_lossy().to_string());
+        Err(err) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to create file: {}", err),
+            )
+                .into_response();
+        }
     }
 
-    if created_files.is_empty() {
-        (StatusCode::BAD_REQUEST, "No file uploaded").into_response()
-    } else {
-        (
-            StatusCode::CREATED,
-            format!("Files uploaded successfully: {:?}", created_files),
-        )
-            .into_response()
+    (
+        StatusCode::CREATED,
+        "File uploaded successfully",
+    ).into_response()
+
+}
+
+
+
+
+async fn get_next_id() -> Result<u64,Box<dyn std::error::Error> >{
+
+    match 
+        reqwest::get("http://localhost:8000/next_post_id").await?
+        .text().await?
+        .parse()
+    {
+        Ok(num) => Ok(num),
+        Err(e) => Err(Box::new(e))
     }
 }

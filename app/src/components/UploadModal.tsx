@@ -64,7 +64,6 @@ const UploadModal: Component<{ toggleModal: () => void }> = (props) => {
     }
   
     try {
-      // 1) Envia o arquivo para o servidor de arquivos
       const formData = new FormData();
       formData.append("file", file()!);
   
@@ -79,11 +78,10 @@ const UploadModal: Component<{ toggleModal: () => void }> = (props) => {
         return;
       }
   
-      // 2) Envia os metadados para a API
       const payload = {
         uploader: user(),
         artist: artist(),
-        tags: selectedTags().map((t) => ({ name: t, tag_type: "C" })), // exemplo
+        tags: selectedTags().map((t) => ({ name: t, tag_type: "" })), // exemplo
       };
   
       const apiRes = await fetch("http://localhost:8000/upload", {
