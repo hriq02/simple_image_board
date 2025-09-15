@@ -41,6 +41,7 @@ async fn run() -> Result<(), std::io::Error>{
         .route("/upload",post(endpoints::upload))
         .route("/new_tag",post(endpoints::new_tag))
         .route("/next_post_id",get(endpoints::get_next_post_id))
+        .route("/remove_post/{file_id}",post(endpoints::remove_post))
         .route("/playground", 
             get(graphql_playground)
             .post(graphql_handler)

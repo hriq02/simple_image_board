@@ -110,7 +110,36 @@ pub async fn stream_with_range(
         .unwrap()
 }
 
+pub async fn remove_file(
+    Path(filename): Path<String>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
 
+    let id : u64 = match filename.parse(){
+        Ok(vl) => vl,
+        Err(_) => {
+            return (StatusCode::BAD_REQUEST, format!("Not a valid id: {}" , filename)).into_response();
+        }
+    };
+    let mut file_register = state.file_register.lock().await;
+    
+    let file_path = match file_register.get_path(id){
+        Some(path) => path,
+        None => {
+            return (StatusCode::NOT_FOUND, format!("File Not Found: {}" , filename)).into_response();
+        }
+    };
+
+    match tokio::fs::remove_file(file_path).await{
+        Ok(()) => {},
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to remove file: {}", e)).into_response();
+        }
+    };
+    file_register.remove(&id);
+    
+    (StatusCode::OK, "File removed").into_response()
+}
 
 
 pub async fn insert_new_file(
@@ -165,17 +194,21 @@ pub async fn insert_new_file(
             ).into_response();
         }
     };
-    println!("new file created with the id: {}", next_num);
+    let file_path = PathBuf::from(
+                        format!(
+                            "{}/{}.{}", 
+                            file_register.folder.to_string_lossy(), 
+                            next_num, 
+                            original_ext
+                        ));
     
     file_register.insert(next_num, FileMetadata{
-        file_path: next_num.to_string(),
+        file_path: file_path.to_string_lossy().to_string(),
         extension: original_ext.clone(),
         file_size: data.len() as u64,
         file_type: get_file_type(&original_ext)
     });
-
-    let file_path = PathBuf::from(format!("{}/{}.{}", file_register.folder.to_string_lossy(), next_num, original_ext));
-
+    
     match OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -206,6 +239,7 @@ pub async fn insert_new_file(
     ).into_response()
 
 }
+
 
 
 

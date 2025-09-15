@@ -12,6 +12,7 @@ const RED : &str = "\x1b[31m";
 const YELLOW : &str = "\x1b[33m";
 const NORMAL : &str = "\x1b[0m";
 
+const LOG_FOLDER : &str = "./logs";
 
 pub enum LogLevel {
     Info,
@@ -57,7 +58,13 @@ fn write_to_file(message : &str) -> std::io::Result<()> {
             OpenOptions::new()
             .append(true)
             .create(true)
-            .open(chrono::Local::now().format("%Y-%m-%d.log").to_string())?
+            .open(
+                format!("{}/{}", LOG_FOLDER,
+                    chrono::Local::now()
+                            .format("%Y-%m-%d.log")
+                            .to_string()
+                )
+            )?
         )
         
     , "{}", message)?;

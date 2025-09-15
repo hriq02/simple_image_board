@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt, path::PathBuf};
 use mime_guess::mime;
 
 
@@ -17,6 +17,17 @@ impl Clone for FileType {
         }
     }
 }
+
+impl fmt::Display for FileType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FileType::Image => write!(f, "Image"),
+            FileType::Video => write!(f, "Video"),
+            FileType::Gif => write!(f, "Gif"),
+        }
+    }
+}
+
 
 impl PartialEq for FileType {
     fn eq(&self, other: &Self) -> bool {
@@ -52,6 +63,13 @@ impl Clone for FileMetadata{
     }
 }
 
+impl fmt::Display for FileMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "FileMetadata:\nfile_path: {}\nfile_type: {}\nextension: .{}\nfile_size: {} bytes",
+               self.file_path, self.file_type, self.extension, self.file_size)
+    }
+}
+
 impl FileRegister{
     pub fn new(folder_path : &str)->FileRegister{
         FileRegister{
@@ -70,7 +88,19 @@ impl FileRegister{
     }
 
     pub fn insert(&mut self, id : u64, file : FileMetadata){
-        self.files.insert(id, file);
+        self.files.insert(id, file.clone());
+    }
+
+
+    pub fn get_path(&self, id : u64) -> Option<String>{
+        match self.files.get(&id){
+            Some(file) => Some(file.file_path.clone()),
+            None => None
+        }
+    }
+
+    pub fn remove(&mut self, id : &u64){
+        self.files.remove(id);
     }
 
     pub fn map_files(&mut self, files_path : &str) -> Result<(),Box<dyn std::error::Error>>{

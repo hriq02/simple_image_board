@@ -208,10 +208,9 @@ const UploadModal: Component<{ toggleModal: () => void }> = (props) => {
         </div>
       </div>
 
-      {/* Modal criar nova tag */}
       {newTagModalOpen() && (
         <CreateTagModal
-          initialName={newTagInitialName()}
+          initialName={newTagName()}
           onClose={() => setNewTagModalOpen(false)}
           onCreated={(tagName) => addTag(tagName)}
         />

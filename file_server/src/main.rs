@@ -56,6 +56,7 @@ async fn main() {
     let app = Router::new()
         .route("/:filename", get(file_router::serve_file))
         .route("/", post(file_router::insert_new_file))
+        .route("/remove/:filename", get(file_router::remove_file))
         .with_state(AppState {
             file_register
         })

@@ -26,3 +26,5 @@ node_modules/
 
 resources/
 *:Zone.Identifier
+logs
+.log
